@@ -1,4 +1,4 @@
-# node-indri
+
 node-indri is native Node.js module that integrates Node.js and [Indri](https://www.lemurproject.org/indri.php) search engine 
 
 # Setup
@@ -19,14 +19,14 @@ sudo npm install cmake-js -g
 ```
 
 - Install [Indri](https://www.lemurproject.org/indri.php):
-
-    wget <url-to-indri-5.11.tar.gz>
-    tar xzvf indri-5.11.tar.gz
-    cd indri-5.11
-    ./configure
-    make
-    sudo make install
-
+```
+wget <url-to-indri-5.11.tar.gz>
+tar xzvf indri-5.11.tar.gz
+cd indri-5.11
+./configure
+make
+sudo make install
+```
 - Finally install node-indri
 
 ```
@@ -54,7 +54,7 @@ var results = searcher.search(query, nDocs, relFbDocs);
 
 node-indri was implemented using Native Abstractions for Node.js (NAN) and C++11. It supports a simple searching function with relevance feedback.
 
- 
+
 
 
 
