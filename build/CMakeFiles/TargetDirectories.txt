@@ -1,3 +1,0 @@
-/var/node-indri/build/CMakeFiles/edit_cache.dir
-/var/node-indri/build/CMakeFiles/rebuild_cache.dir
-/var/node-indri/build/CMakeFiles/node-indri.dir
