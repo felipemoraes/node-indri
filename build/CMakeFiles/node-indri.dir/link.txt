@@ -1,0 +1,1 @@
+/usr/bin/c++  -fPIC -std=c++11 -DP_NEEDS_GNU_CXX_NAMESPACE=1 -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -g -O3 -Wno-deprecated-declarations -O3 -DNDEBUG  -shared -Wl,-soname,node-indri.node -o Release/node-indri.node CMakeFiles/node-indri.dir/src/indri.cpp.o -lindri -lz -lpthread -lm 
