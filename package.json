@@ -4,7 +4,8 @@
   "description": "node-indri is an addon to integrate Node.js and Indri search engine",
   "main": "index.js",
   "scripts": {
-    "install": "cmake-js compile"
+    "install": "cmake-js rebuild",
+    "test": "./node_modules/.bin/mocha --timeout 15000 --exit"
   },
   "repository": {
     "type": "git",
@@ -18,6 +19,7 @@
   "homepage": "https://github.com/felipemoraes/node-indri#readme",
   "dependencies": {
     "bindings": "^1.3.0",
+    "chai": "^4.1.2",
     "cmake-js": "^3.6.2",
     "mocha": "^5.0.5",
     "nan": "^2.10.0"
