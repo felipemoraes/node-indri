@@ -20,17 +20,18 @@ sudo npm install cmake-js -g
 
 - Install [Indri](https://www.lemurproject.org/indri.php):
 ```
-wget <url-to-indri-5.11.tar.gz>
+wget <link-5.11.tar.gz>
 tar xzvf indri-5.11.tar.gz
 cd indri-5.11
 ./configure
 make
 sudo make install
 ```
-- Finally install node-indri
+
+- Install node-indri
 
 ```
-npm install 
+npm install --unsafe-perm
 ```
 
 - To test if everything works:
@@ -41,18 +42,25 @@ npm test
 # Examples
 
 ```
-var indri =  require('node-indri');
+const indri =  require('../build/Release/node-indri');
 
-var searcher = new indri.Searcher(indexPath, method);
+var searcher = new indri.Searcher(
+    
+    {"index": "index_path", 
+    "rules" : "rules", // method:dirichlet,mu:1000
+    "fbTerms": 10,
+    "fbMu": 1500, 
+    "nameField": "title", 
+    "resultsPerPage": 10}
+);
 
-var results = searcher.search(query, nDocs, relFbDocs);
+searcher.search(query, page, feedback_docs, callback);
 
 ```
 
-
 # Implementation details 
 
-node-indri was implemented using Native Abstractions for Node.js (NAN) and C++11. It supports a simple searching function with relevance feedback.
+node-indri was implemented using Native Abstractions for Node.js (NAN) and C++11. It supports a simple async searching function with relevance feedback.
 
 
 

@@ -1,13 +1,7 @@
-#include <indri/CompressedCollection.hpp>
-#include <indri/DiskIndex.hpp>
-#include <indri/KrovetzStemmer.hpp>
 #include <indri/QueryEnvironment.hpp>
-#include <indri/QueryParserFactory.hpp>
-#include <indri/QuerySpec.hpp>
-#include <indri/Path.hpp>
-#include <indri/Porter_Stemmer.hpp>
 #include <indri/RMExpander.hpp>
 #include <indri/SnippetBuilder.hpp>
+
 
 #include <cmath>
 #include <nan.h>
@@ -17,13 +11,11 @@
 
 using namespace Nan;
 
-
-typedef struct {
-  string title;
-  string docno;
-  string snippet;
+typedef struct  {
+    std::string docno;
+    std::string name;
+    std::string snippet;
 } SearchResult;
-
 
 vector<SearchResult> search(indri::api::Parameters& parameters, std::string query, 
         int page, std::vector<std::string> rel_fb_docs){
@@ -70,12 +62,12 @@ vector<SearchResult> search(indri::api::Parameters& parameters, std::string quer
 
 
     std::vector<indri::api::ParsedDocument*> documents;
-    std::vector<std::string> documentNames;
-    std::vector<std::string> headlines;
+    std::vector<std::string> docnos;
+    std::vector<std::string> names;
 
     documents = environment.documents(results);
-    documentNames = environment.documentMetadata( results, "docno" );
-    headlines = environment.documentMetadata(results, parameters.get("titleField", ""));
+    docnos = environment.documentMetadata( results, "docno" );
+    names = environment.documentMetadata(results, parameters.get("nameField", ""));
 
     vector<SearchResult> searchResults;
 
@@ -88,8 +80,8 @@ vector<SearchResult> search(indri::api::Parameters& parameters, std::string quer
         snippet.erase(std::remove(snippet.begin(), snippet.end(), '\n'), snippet.end());
 
         SearchResult result;
-        result.title = headlines[i];
-        result.docno = documentNames[i];
+        result.name = names[i];
+        result.docno = docnos[i];
         result.snippet = snippet;
 
         searchResults.push_back(result);
@@ -100,31 +92,31 @@ vector<SearchResult> search(indri::api::Parameters& parameters, std::string quer
 }
 
 
-
 static Persistent<v8::FunctionTemplate> constructor;
 
 
-class MyAsyncWorker : public Nan::AsyncWorker {
-public:
-  indri::api::Parameters parameters;
-  std::string query; 
-  int page; 
-  std::vector<std::string> rel_fb_docs;
-  vector<SearchResult> results;
+class SearchAsyncWorker : public Nan::AsyncWorker {
+private:
 
-  MyAsyncWorker(indri::api::Parameters& parameters, std::string query, 
-        int page, std::vector<std::string> rel_fb_docs, Nan::Callback *callback)
+  indri::api::Parameters parameters_;
+  std::string query_; 
+  int page_; 
+  std::vector<std::string> rel_fb_docs_;
+  vector<SearchResult> results_;
+
+public:
+  SearchAsyncWorker(indri::api::Parameters& parameters, std::string query, 
+        int page, std::vector<std::string> &rel_fb_docs, Nan::Callback *callback)
     : Nan::AsyncWorker(callback) {
 
-    this->parameters = parameters;
-    this->query = query;
-    this->page = page;
-    this->rel_fb_docs = rel_fb_docs;
+    this->parameters_ = parameters;
+    this->query_ = query;
+    this->page_ = page;
+    this->rel_fb_docs_ = rel_fb_docs;
   }
 
   void Execute() {
-    this->results = search(this->parameters, this->query, this->page, this->rel_fb_docs);
-    std::cout << "HERE" << std::endl;
+    this->results_ = search(this->parameters_, this->query_, this->page_, this->rel_fb_docs_);
   }
 
   void HandleOKCallback() {
@@ -133,22 +125,21 @@ public:
 
     v8::Local<v8::Array> resultArray = Nan::New<v8::Array>();
 
-    for(int i = 0; i < this->results.size(); ++i) {
-        SearchResult result = this->results.at(i);
+    for(int i = 0; i < this->results_.size(); ++i) {
+        SearchResult result = this->results_.at(i);
         v8::Local<v8::Object> jsonObject = Nan::New<v8::Object>();
 
         v8::Local<v8::String> docnoKey = Nan::New("url").ToLocalChecked();
-        v8::Local<v8::String> titleKey = Nan::New("name").ToLocalChecked();
+        v8::Local<v8::String> nameKey = Nan::New("name").ToLocalChecked();
         v8::Local<v8::String> snippetKey = Nan::New("snippet").ToLocalChecked();
 
         v8::Local<v8::Value> docnoValue = Nan::New(result.docno).ToLocalChecked();
-        v8::Local<v8::Value> tittleValue = Nan::New(result.title).ToLocalChecked();
+        v8::Local<v8::Value> nameValue = Nan::New(result.name).ToLocalChecked();
         v8::Local<v8::Value> snippetValue = Nan::New(result.snippet).ToLocalChecked();
 
         Nan::Set(jsonObject, docnoKey, docnoValue);
-        Nan::Set(jsonObject, titleKey, tittleValue);
+        Nan::Set(jsonObject, nameKey, nameValue);
         Nan::Set(jsonObject, snippetKey, snippetValue);
-
         resultArray->Set(i, jsonObject);
     }
 
@@ -168,6 +159,7 @@ public:
     callback->Call(2, argv);
   }
 };
+
 
 
 class Searcher : public Nan::ObjectWrap{
@@ -216,14 +208,14 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> rulesProp = Nan::New("rules").ToLocalChecked();
     v8::Local<v8::String> fbTermsProp = Nan::New("fbTerms").ToLocalChecked();
     v8::Local<v8::String> fbMuProp = Nan::New("fbMu").ToLocalChecked();
-    v8::Local<v8::String> titleFieldProp = Nan::New("titleField").ToLocalChecked();
+    v8::Local<v8::String> nameFieldProp = Nan::New("nameField").ToLocalChecked();
     v8::Local<v8::String> resultsPerPageProp = Nan::New("resultsPerPage").ToLocalChecked();
 
     std::string index = "";
 
     std::string rule = "";
 
-    std::string title = "";
+    std::string nameField = "title";
 
     int fbTerms = 100;
     int fbMu = 1500;
@@ -258,10 +250,10 @@ class Searcher : public Nan::ObjectWrap{
       parameters.set("fbMu", fbMu);
     }
 
-    if (Nan::HasOwnProperty(jsonObj, titleFieldProp).FromJust()) {
-      v8::Local<v8::Value> titleValue = Nan::Get(jsonObj, titleFieldProp).ToLocalChecked();
-      title = std::string(*Nan::Utf8String(titleValue->ToString()));
-      parameters.set("titleField", title);
+    if (Nan::HasOwnProperty(jsonObj, nameFieldProp).FromJust()) {
+      v8::Local<v8::Value> nameValue = Nan::Get(jsonObj, nameFieldProp).ToLocalChecked();
+      nameField = std::string(*Nan::Utf8String(nameValue->ToString()));
+      parameters.set("nameField", nameField);
     }
 
     if (Nan::HasOwnProperty(jsonObj, resultsPerPageProp).FromJust()) {
@@ -287,36 +279,36 @@ class Searcher : public Nan::ObjectWrap{
 
 NAN_METHOD(Searcher::Search){
 
-    // expect exactly 2 arguments
-    if(info.Length() < 2) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected arguments query, n_request").ToLocalChecked());
+    // expect exactly 3 arguments
+    if(info.Length() == 3) {
+      return Nan::ThrowError(Nan::New("Searcher::Search - expected 3 arguments").ToLocalChecked());
     }
 
     // expect first argument to be string
     if(!info[0]->IsString()) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected first argument to be a string").ToLocalChecked());
+      return Nan::ThrowError(Nan::New("expected arg 1: string").ToLocalChecked());
     }
 
 
     // expect second argument to be number
     if(!info[1]->IsNumber()) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected second argument to be a number").ToLocalChecked());
+      return Nan::ThrowError(Nan::New("expected arg 2: number").ToLocalChecked());
     }
 
     if (!info[2]->IsArray()) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected third argument to be an array").ToLocalChecked());
+      return Nan::ThrowError(Nan::New("expected arg 3: array").ToLocalChecked());
     }
 
+    if(!info[3]->IsFunction()) {
+      return Nan::ThrowError(Nan::New("expected arg 4: function callback").ToLocalChecked());
+    }
 
-    // if(!info[3]->IsFunction()) {
-    //   return Nan::ThrowError(Nan::New("expected arg 3: function callback").ToLocalChecked());
-    // }
 
     v8::String::Utf8Value arg1(info[0]->ToString());
     
     std::string query(*arg1, arg1.length());
     
-    double n_request = info[1]->IsUndefined() ? 10 : info[1]->NumberValue();
+    double page = info[1]->IsUndefined() ? 10 : info[1]->NumberValue();
 
     std::vector<std::string> rel_fb_docs;
 
@@ -330,18 +322,12 @@ NAN_METHOD(Searcher::Search){
 
     Searcher* obj = ObjectWrap::Unwrap<Searcher>(info.Holder());
 
-    if(!info[3]->IsFunction()) {
-      return Nan::ThrowError(Nan::New("expected arg 3: function callback").ToLocalChecked());
-    }
-
     // starting the async worker
-    Nan::AsyncQueueWorker(new MyAsyncWorker(obj->parameters, query, 1, rel_fb_docs,
+    Nan::AsyncQueueWorker(new SearchAsyncWorker(obj->parameters, query, page, rel_fb_docs,
             new Nan::Callback(info[3].As<v8::Function>())
     ));
 
 }
-
-
   
 void InitIndri(v8::Local<v8::Object> exports) {
   Searcher::Init(exports);
