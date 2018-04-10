@@ -1,4 +1,5 @@
 #include <indri/QueryEnvironment.hpp>
+#include <indri/Parameters.hpp>
 #include <indri/RMExpander.hpp>
 #include <indri/SnippetBuilder.hpp>
 
@@ -7,67 +8,73 @@
 #include <nan.h>
 #include <string>
 #include <algorithm>
+#include <unordered_map>
 #include <iostream>
 
 using namespace Nan;
 
+
 typedef struct  {
-    std::string docno;
-    std::string name;
+    std::unordered_map<std::string,std::string> fields;
     std::string snippet;
+    std::string document;
+    int docid;
 } SearchResult;
 
-vector<SearchResult> search(indri::api::Parameters& parameters, std::string query, 
-        int page, std::vector<std::string> rel_fb_docs){
+
+typedef struct  {
+  std::unordered_map<std::string,std::string> includeFields;
+  int results_per_page;
+  indri::api::QueryEnvironment* environment;
+  indri::query::QueryExpander* expander;
+  indri::api::Parameters parameters;
+  bool includeDocument;
+} SearchParameters;
+
+
+vector<SearchResult> search(SearchParameters& parameters, std::string query,
+    int page, std::vector<int>& feedback_docs){
 
     
-    indri::api::QueryEnvironment environment;
     indri::api::QueryAnnotation* annotation;
-    indri::query::QueryExpander* expander;
-
-    
-    std::vector<std::string> rules;
-    rules.push_back(parameters.get("rules", ""));
-    environment.setScoringRules(rules);
-    
-    environment.addIndex(parameters.get("index"));
-
-    expander = new indri::query::RMExpander( &environment, parameters);
-    std::vector<lemur::api::DOCID_T> docids;
-
-    if (rel_fb_docs.size()>0) {
-      docids = environment.documentIDsFromMetadata("docno", rel_fb_docs);
-    }
 
     std::vector<indri::api::ScoredExtentResult> results;
-    int resultsPerPage = parameters.get("resultsPerPage", 10);
+    int resultsPerPage = parameters.results_per_page;
     int numberResults = page*resultsPerPage;
     
-    if (docids.size() != 0) {
-        std::vector<indri::api::ScoredExtentResult> fbDocs;
-        for (int i = 0; i < docids.size(); i++) {
-          indri::api::ScoredExtentResult r(0.0, docids[i]);
-          fbDocs.push_back(r);
-        }
+    if (feedback_docs.size() != 0) {
 
-        std::string expandedQuery = expander->expand( query, fbDocs);
-        annotation = environment.runAnnotatedQuery( expandedQuery, numberResults);
+        std::vector<indri::api::ScoredExtentResult> score_fb_docs;
+        for (int i = 0; i < feedback_docs.size(); i++) {
+          indri::api::ScoredExtentResult r(0.0, feedback_docs[i]);
+          score_fb_docs.push_back(r);
+        }
+        std::cout << parameters.environment << std::endl;
+        std::string expandedQuery = parameters.expander->expand( query, score_fb_docs);
+        
+        annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
         results  = annotation->getResults();
     } else {
-      annotation = environment.runAnnotatedQuery( query, numberResults);
+      annotation = parameters.environment->runAnnotatedQuery( query, numberResults);
       results  = annotation->getResults();
     }
 
-    //v8::Local<v8::Array> jsArr1 = Nan::New<v8::Array>(5);  
-
+    
 
     std::vector<indri::api::ParsedDocument*> documents;
     std::vector<std::string> docnos;
-    std::vector<std::string> names;
+    std::vector<std::string> titles;
 
-    documents = environment.documents(results);
-    docnos = environment.documentMetadata( results, "docno" );
-    names = environment.documentMetadata(results, parameters.get("nameField", ""));
+   
+    documents = parameters.environment->documents(results);
+    
+
+    std::unordered_map<std::string,std::vector<std::string> > fieldsData;
+
+    for (auto fieldMap : parameters.includeFields) {
+        auto valueFields = parameters.environment->documentMetadata(results, fieldMap.first);
+        fieldsData.emplace(fieldMap.first, valueFields);
+    }
 
     vector<SearchResult> searchResults;
 
@@ -80,14 +87,24 @@ vector<SearchResult> search(indri::api::Parameters& parameters, std::string quer
         snippet.erase(std::remove(snippet.begin(), snippet.end(), '\n'), snippet.end());
 
         SearchResult result;
-        result.name = names[i];
-        result.docno = docnos[i];
         result.snippet = snippet;
+        result.docid = results[i].document;
+
+        if (parameters.includeDocument) {
+          result.document =  std::string(documents[i]->text, documents[i]->textLength);
+        }
+
+
+      for (auto fieldMap : fieldsData) {
+        auto valueFields = fieldMap.second;
+        result.fields.emplace(fieldMap.first, valueFields[i]);
+      
+      } 
+
 
         searchResults.push_back(result);
        
     }
-
     return searchResults;
 }
 
@@ -98,25 +115,25 @@ static Persistent<v8::FunctionTemplate> constructor;
 class SearchAsyncWorker : public Nan::AsyncWorker {
 private:
 
-  indri::api::Parameters parameters_;
+  SearchParameters parameters_;
   std::string query_; 
   int page_; 
-  std::vector<std::string> rel_fb_docs_;
+  std::vector<int> feedback_docs_;
   vector<SearchResult> results_;
 
 public:
-  SearchAsyncWorker(indri::api::Parameters& parameters, std::string query, 
-        int page, std::vector<std::string> &rel_fb_docs, Nan::Callback *callback)
+  SearchAsyncWorker(SearchParameters& parameters, std::string query, 
+        int page, std::vector<int> &feedback_docs, Nan::Callback *callback)
     : Nan::AsyncWorker(callback) {
 
     this->parameters_ = parameters;
     this->query_ = query;
     this->page_ = page;
-    this->rel_fb_docs_ = rel_fb_docs;
+    this->feedback_docs_ = feedback_docs;
   }
 
   void Execute() {
-    this->results_ = search(this->parameters_, this->query_, this->page_, this->rel_fb_docs_);
+    this->results_ = search(this->parameters_, this->query_, this->page_, this->feedback_docs_);
   }
 
   void HandleOKCallback() {
@@ -125,21 +142,38 @@ public:
 
     v8::Local<v8::Array> resultArray = Nan::New<v8::Array>();
 
+
+    v8::Local<v8::String> docidKey = Nan::New("docid").ToLocalChecked();
+    v8::Local<v8::String> fieldsKey = Nan::New("fields").ToLocalChecked();
+    v8::Local<v8::String> snippetKey = Nan::New("snippet").ToLocalChecked();
+    v8::Local<v8::String> documentKey = Nan::New("document").ToLocalChecked();
+
+
     for(int i = 0; i < this->results_.size(); ++i) {
+
         SearchResult result = this->results_.at(i);
+
         v8::Local<v8::Object> jsonObject = Nan::New<v8::Object>();
+        v8::Local<v8::Object> fieldsJsonObject = Nan::New<v8::Object>();
+        
+        for(auto fieldMap : result.fields) {
+          v8::Local<v8::String> key = Nan::New(fieldMap.first).ToLocalChecked();
+          v8::Local<v8::String> value = Nan::New(fieldMap.second).ToLocalChecked();
+          Nan::Set(fieldsJsonObject, key, value);
+        }
 
-        v8::Local<v8::String> docnoKey = Nan::New("url").ToLocalChecked();
-        v8::Local<v8::String> nameKey = Nan::New("name").ToLocalChecked();
-        v8::Local<v8::String> snippetKey = Nan::New("snippet").ToLocalChecked();
-
-        v8::Local<v8::Value> docnoValue = Nan::New(result.docno).ToLocalChecked();
-        v8::Local<v8::Value> nameValue = Nan::New(result.name).ToLocalChecked();
+        v8::Local<v8::Value> docidValue = Nan::New(result.docid);
         v8::Local<v8::Value> snippetValue = Nan::New(result.snippet).ToLocalChecked();
 
-        Nan::Set(jsonObject, docnoKey, docnoValue);
-        Nan::Set(jsonObject, nameKey, nameValue);
+        Nan::Set(jsonObject, docidKey, docidValue);
         Nan::Set(jsonObject, snippetKey, snippetValue);
+        Nan::Set(jsonObject, fieldsKey, fieldsJsonObject);
+
+        if (this->parameters_.includeDocument) {
+          v8::Local<v8::String> documentValue = Nan::New(result.document).ToLocalChecked();
+          Nan::Set(jsonObject, documentKey, documentValue);
+        }
+
         resultArray->Set(i, jsonObject);
     }
 
@@ -162,6 +196,8 @@ public:
 
 
 
+
+
 class Searcher : public Nan::ObjectWrap{
 
  public:
@@ -176,7 +212,7 @@ class Searcher : public Nan::ObjectWrap{
       Set(target, Nan::New<v8::String>("Searcher").ToLocalChecked(), tpl->GetFunction());
   }
 
-  indri::api::Parameters parameters;
+  SearchParameters parameters;
 
   explicit Searcher() {
   }
@@ -208,63 +244,106 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> rulesProp = Nan::New("rules").ToLocalChecked();
     v8::Local<v8::String> fbTermsProp = Nan::New("fbTerms").ToLocalChecked();
     v8::Local<v8::String> fbMuProp = Nan::New("fbMu").ToLocalChecked();
-    v8::Local<v8::String> nameFieldProp = Nan::New("nameField").ToLocalChecked();
+    v8::Local<v8::String> fieldsProp = Nan::New("includeFields").ToLocalChecked();
     v8::Local<v8::String> resultsPerPageProp = Nan::New("resultsPerPage").ToLocalChecked();
+    v8::Local<v8::String> includeDocumentProp = Nan::New("includeDocument").ToLocalChecked();
 
     std::string index = "";
 
     std::string rule = "";
 
-    std::string nameField = "title";
+    std::unordered_map<std::string, std::string> fields;
+
+    bool includeDocument = false;
 
     int fbTerms = 100;
     int fbMu = 1500;
 
     int resultsPerPage = 10;
 
-    indri::api::Parameters parameters;
+    indri::api::Parameters* parameters = new indri::api::Parameters();
   
     if (Nan::HasOwnProperty(jsonObj, indexProp).FromJust()) {
       v8::Local<v8::Value> indexValue = Nan::Get(jsonObj, indexProp).ToLocalChecked();
       index = std::string(*Nan::Utf8String(indexValue->ToString()));
-      parameters.set("index", index);
+      parameters->set("index", index);
     }
-
 
     if (Nan::HasOwnProperty(jsonObj, rulesProp).FromJust()) {
       v8::Local<v8::Value> rulesValue = Nan::Get(jsonObj, rulesProp).ToLocalChecked();
       rule = std::string(*Nan::Utf8String(rulesValue->ToString()));
-      parameters.set("rules", rule);
+      parameters->set("rules", rule);
     }
 
 
     if (Nan::HasOwnProperty(jsonObj, fbTermsProp).FromJust()) {
       v8::Local<v8::Value> fbMuValue = Nan::Get(jsonObj, fbTermsProp).ToLocalChecked();
       fbTerms = fbMuValue->NumberValue();
-      parameters.set("fbTerms", fbTerms);
+      parameters->set("fbTerms", fbTerms);
     }
 
     if (Nan::HasOwnProperty(jsonObj, fbMuProp).FromJust()) {
       v8::Local<v8::Value> fbMuValue = Nan::Get(jsonObj, fbMuProp).ToLocalChecked();
       fbMu = fbMuValue->NumberValue();
-      parameters.set("fbMu", fbMu);
+      parameters->set("fbMu", fbMu);
     }
 
-    if (Nan::HasOwnProperty(jsonObj, nameFieldProp).FromJust()) {
-      v8::Local<v8::Value> nameValue = Nan::Get(jsonObj, nameFieldProp).ToLocalChecked();
-      nameField = std::string(*Nan::Utf8String(nameValue->ToString()));
-      parameters.set("nameField", nameField);
+    
+
+    if (Nan::HasOwnProperty(jsonObj, fieldsProp).FromJust()) {
+
+      v8::Local<v8::Object> jsonFieldObj = Nan::Get(jsonObj, fieldsProp).ToLocalChecked()->ToObject();
+
+      v8::Local<v8::Array> fieldsProps = Nan::GetPropertyNames(jsonFieldObj).ToLocalChecked();
+
+
+      for (int i = 0; i < fieldsProps->Length(); i++){
+        
+        std::string key = std::string(*Nan::Utf8String(fieldsProps->Get(i)->ToString()));
+        v8::Local<v8::Value> fieldValue = Nan::Get(jsonFieldObj, fieldsProps->Get(i)).ToLocalChecked();
+        std::string value = std::string(*Nan::Utf8String(fieldValue->ToString()));
+        fields.emplace(key, value);
+      }
     }
 
     if (Nan::HasOwnProperty(jsonObj, resultsPerPageProp).FromJust()) {
       v8::Local<v8::Value> resultsPerPageValue = Nan::Get(jsonObj, resultsPerPageProp).ToLocalChecked();
       resultsPerPage = resultsPerPageValue->NumberValue();
-      parameters.set("resultsPerPage", resultsPerPage);
     }
-    
+
+    if (Nan::HasOwnProperty(jsonObj, includeDocumentProp).FromJust()) {
+      v8::Local<v8::Value> includeDocumentValue = Nan::Get(jsonObj, includeDocumentProp).ToLocalChecked();
+      includeDocument = includeDocumentValue->BooleanValue();
+    }
+
     Searcher* obj = new Searcher();
 
-    obj->parameters = parameters;
+        
+    std::vector<std::string> rules;
+
+    rules.push_back(parameters->get("rules", ""));
+
+    indri::api::QueryEnvironment* environment = new indri::api::QueryEnvironment();
+    indri::query::QueryExpander* expander;
+
+    environment->setScoringRules(rules);
+    
+    environment->addIndex(parameters->get("index", ""));
+
+    expander = new indri::query::RMExpander(environment, *parameters);
+
+    
+
+    SearchParameters search_parameters;
+    search_parameters.environment = environment;
+    search_parameters.expander = expander;
+    search_parameters.includeFields = fields;
+    search_parameters.includeDocument = includeDocument;
+    search_parameters.results_per_page = resultsPerPage;
+
+    
+
+    obj->parameters = search_parameters;
 
     obj->Wrap(info.This());
     
@@ -310,20 +389,17 @@ NAN_METHOD(Searcher::Search){
     
     double page = info[1]->IsUndefined() ? 10 : info[1]->NumberValue();
 
-    std::vector<std::string> rel_fb_docs;
+    std::vector<int> fb_docs;
 
     v8::Local<v8::Array> jsArr = v8::Local<v8::Array>::Cast(info[2]);
     for (int i = 0; i < jsArr->Length(); i++) {
         v8::Local<v8::Value> jsElement = jsArr->Get(i);
-        v8::String::Utf8Value str(jsElement->ToString());
-        std::string doc (*str,str.length());
-        rel_fb_docs.push_back(doc);
+        fb_docs.push_back(jsElement->NumberValue());
     } 
 
     Searcher* obj = ObjectWrap::Unwrap<Searcher>(info.Holder());
 
-    // starting the async worker
-    Nan::AsyncQueueWorker(new SearchAsyncWorker(obj->parameters, query, page, rel_fb_docs,
+    Nan::AsyncQueueWorker(new SearchAsyncWorker(obj->parameters, query, page, fb_docs,
             new Nan::Callback(info[3].As<v8::Function>())
     ));
 

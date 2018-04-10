@@ -45,13 +45,17 @@ npm test
 const indri =  require('../build/Release/node-indri');
 
 var searcher = new indri.Searcher(
-    
-    {"index": "index_path", 
+    {
+    "index": "index_path", 
     "rules" : "rules", // method:dirichlet,mu:1000
     "fbTerms": 10,
     "fbMu": 1500, 
-    "nameField": "title", 
-    "resultsPerPage": 10}
+    "resultsPerPage": 10,
+    "includeDocument" : true,
+    "includeDocument": [{ 
+        "nameInIndex1": "nameInResponse1", 
+        "nameInIndex2": "nameInResponse2"
+    }]}
 );
 
 searcher.search(query, page, feedback_docs, callback);

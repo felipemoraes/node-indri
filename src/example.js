@@ -2,15 +2,16 @@ const indri = require('../build/Release/node-indri');
 
 
 var searcher = new indri.Searcher( 
-    {"index": "/var/node-indri/etc/poems_index", 
+    {"index": "./etc/poems_index", 
     "rules" : "method:dirichlet,mu:1000",
     "fbTerms": 10,
     "fbMu": 1500, 
-    "nameField": "title", 
-    "resultsPerPage": 1}
+    "includeFields": { "title": "headline", "docno": "docno"},
+    "includeDocument" : true,
+    "resultsPerPage": 10}
 );
 
-var results = searcher.search("school", 2, ["doc3"], function(error, results) {
+var results = searcher.search("school", 1, [2], function(error, results) {
     if (error) {
       console.log("error");
     }
