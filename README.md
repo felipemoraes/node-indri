@@ -23,7 +23,7 @@ sudo npm install cmake-js -g
 wget <link-5.11.tar.gz>
 tar xzvf indri-5.11.tar.gz
 cd indri-5.11
-./configure
+./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0"
 make
 sudo make install
 ```
@@ -52,10 +52,11 @@ var searcher = new indri.Searcher(
     "fbMu": 1500, 
     "resultsPerPage": 10,
     "includeDocument" : true,
-    "includeDocument": [{ 
-        "nameInIndex1": "nameInResponse1", 
-        "nameInIndex2": "nameInResponse2"
-    }]}
+        "includeFields": [{ 
+            "nameInIndex1": "nameInResponse1", 
+            "nameInIndex2": "nameInResponse2"
+        }
+    ]}
 );
 
 searcher.search(query, page, feedback_docs, callback);

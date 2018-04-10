@@ -59,7 +59,6 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
       results  = annotation->getResults();
     }
 
-    
 
     std::vector<indri::api::ParsedDocument*> documents;
     std::vector<std::string> docnos;
