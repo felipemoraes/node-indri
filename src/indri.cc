@@ -49,7 +49,6 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
           indri::api::ScoredExtentResult r(0.0, feedback_docs[i]);
           score_fb_docs.push_back(r);
         }
-        std::cout << parameters.environment << std::endl;
         std::string expandedQuery = parameters.expander->expand( query, score_fb_docs);
         
         annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
@@ -72,7 +71,7 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
 
     for (auto fieldMap : parameters.includeFields) {
         auto valueFields = parameters.environment->documentMetadata(results, fieldMap.first);
-        fieldsData.emplace(fieldMap.first, valueFields);
+        fieldsData.emplace(fieldMap.second, valueFields);
     }
 
     vector<SearchResult> searchResults;
