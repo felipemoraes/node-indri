@@ -144,6 +144,7 @@ public:
     v8::Local<v8::String> docidKey = Nan::New("docid").ToLocalChecked();
     v8::Local<v8::String> fieldsKey = Nan::New("fields").ToLocalChecked();
     v8::Local<v8::String> snippetKey = Nan::New("snippet").ToLocalChecked();
+    v8::Local<v8::String> documentKey = Nan::New("document").ToLocalChecked();
 
 
     for(int i = 0; i < this->results_.size(); ++i) {
@@ -165,6 +166,11 @@ public:
         Nan::Set(jsonObject, docidKey, docidValue);
         Nan::Set(jsonObject, snippetKey, snippetValue);
         Nan::Set(jsonObject, fieldsKey, fieldsJsonObject);
+
+        if (this->parameters_.includeDocument) {
+          v8::Local<v8::String> documentValue = Nan::New(result.document).ToLocalChecked();
+          Nan::Set(jsonObject, documentKey, documentValue);
+        }
 
         resultArray->Set(i, jsonObject);
     }
@@ -238,6 +244,7 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> fbMuProp = Nan::New("fbMu").ToLocalChecked();
     v8::Local<v8::String> fieldsProp = Nan::New("includeFields").ToLocalChecked();
     v8::Local<v8::String> resultsPerPageProp = Nan::New("resultsPerPage").ToLocalChecked();
+    v8::Local<v8::String> includeDocumentProp = Nan::New("includeDocument").ToLocalChecked();
 
     std::string index = "";
 
@@ -245,6 +252,7 @@ class Searcher : public Nan::ObjectWrap{
 
     std::unordered_map<std::string, std::string> fields;
 
+    bool includeDocument = false;
 
     int fbTerms = 100;
     int fbMu = 1500;
@@ -301,7 +309,13 @@ class Searcher : public Nan::ObjectWrap{
       resultsPerPage = resultsPerPageValue->NumberValue();
     }
 
+    if (Nan::HasOwnProperty(jsonObj, includeDocumentProp).FromJust()) {
+      v8::Local<v8::Value> includeDocumentValue = Nan::Get(jsonObj, includeDocumentProp).ToLocalChecked();
+      includeDocument = includeDocumentValue->BooleanValue();
+    }
+
     Searcher* obj = new Searcher();
+
         
     std::vector<std::string> rules;
 
@@ -322,6 +336,7 @@ class Searcher : public Nan::ObjectWrap{
     search_parameters.environment = environment;
     search_parameters.expander = expander;
     search_parameters.includeFields = fields;
+    search_parameters.includeDocument = includeDocument;
     search_parameters.results_per_page = resultsPerPage;
 
     
