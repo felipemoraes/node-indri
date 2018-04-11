@@ -51,11 +51,10 @@ var searcher = new indri.Searcher(
     "fbTerms": 10,
     "fbMu": 1500, 
     "resultsPerPage": 10,
-    "includeDocument" : true,
-        "includeFields": [{ 
-            "nameInIndex1": "nameInResponse1", 
-            "nameInIndex2": "nameInResponse2"
-        }
+    "includeFields": [{ 
+        "nameInIndex1": "nameInResponse1", 
+        "nameInIndex2": "nameInResponse2"
+    }
     ]}
 );
 
