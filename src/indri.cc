@@ -245,6 +245,7 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> fieldsProp = Nan::New("includeFields").ToLocalChecked();
     v8::Local<v8::String> resultsPerPageProp = Nan::New("resultsPerPage").ToLocalChecked();
     v8::Local<v8::String> includeDocumentProp = Nan::New("includeDocument").ToLocalChecked();
+    v8::Local<v8::String>  fbDocsProp = Nan::New("fbDocs").ToLocalChecked();
 
     std::string index = "";
 
@@ -258,6 +259,8 @@ class Searcher : public Nan::ObjectWrap{
     int fbMu = 1500;
 
     int resultsPerPage = 10;
+
+    int fbDocs = -1;
 
     indri::api::Parameters* parameters = new indri::api::Parameters();
   
@@ -277,13 +280,12 @@ class Searcher : public Nan::ObjectWrap{
     if (Nan::HasOwnProperty(jsonObj, fbTermsProp).FromJust()) {
       v8::Local<v8::Value> fbMuValue = Nan::Get(jsonObj, fbTermsProp).ToLocalChecked();
       fbTerms = fbMuValue->NumberValue();
-      parameters->set("fbTerms", fbTerms);
     }
 
     if (Nan::HasOwnProperty(jsonObj, fbMuProp).FromJust()) {
       v8::Local<v8::Value> fbMuValue = Nan::Get(jsonObj, fbMuProp).ToLocalChecked();
       fbMu = fbMuValue->NumberValue();
-      parameters->set("fbMu", fbMu);
+      
     }
 
     
@@ -313,6 +315,16 @@ class Searcher : public Nan::ObjectWrap{
       v8::Local<v8::Value> includeDocumentValue = Nan::Get(jsonObj, includeDocumentProp).ToLocalChecked();
       includeDocument = includeDocumentValue->BooleanValue();
     }
+
+    if (Nan::HasOwnProperty(jsonObj, fbDocsProp).FromJust()) {
+      v8::Local<v8::Value> fbDocsValue = Nan::Get(jsonObj, fbDocsProp).ToLocalChecked();
+      fbDocs = fbDocsValue->NumberValue();
+      
+    }
+
+    parameters->set("fbDocs", fbDocs);
+    parameters->set("fbTerms", fbTerms);
+    parameters->set("fbMu", fbMu);
 
     Searcher* obj = new Searcher();
 
