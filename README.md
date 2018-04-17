@@ -65,6 +65,7 @@ var searcher = new indri.Searcher(
 );
 
 searcher.search(query, page, feedback_docs, callback);
+```
 
 ## Reader 
 
