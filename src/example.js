@@ -18,3 +18,14 @@ var results = searcher.search("school", 1, [2], function(error, results) {
     console.log(results);
   }
 );
+
+
+var reader = new indri.Reader("./etc/poems_index")
+
+reader.getDocument(1,  function(error, data) {
+     if (error) {
+       console.log("error");
+     }
+      console.log(data);
+  }
+);

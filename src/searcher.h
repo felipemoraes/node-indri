@@ -1,3 +1,7 @@
+
+#ifndef SEARCHER_H
+#define SEARCHER_H
+
 #include <indri/QueryEnvironment.hpp>
 #include <indri/Parameters.hpp>
 #include <indri/RMExpander.hpp>
@@ -35,9 +39,7 @@ typedef struct  {
 vector<SearchResult> search(SearchParameters& parameters, std::string query,
     int page, std::vector<int>& feedback_docs);
 
-
-static Persistent<v8::FunctionTemplate> constructor;
-
+static Persistent<v8::FunctionTemplate> searcher_constructor;
 
 class SearchAsyncWorker : public Nan::AsyncWorker {
 private:
@@ -127,7 +129,7 @@ class Searcher : public Nan::ObjectWrap{
  public:
   static NAN_MODULE_INIT(Init) {
       v8::Local<v8::FunctionTemplate> tpl = Nan::New<v8::FunctionTemplate>(Searcher::New);
-      constructor.Reset(tpl);
+      searcher_constructor.Reset(tpl);
       tpl->SetClassName(Nan::New<v8::String>("Searcher").ToLocalChecked());
 
       tpl->InstanceTemplate()->SetInternalFieldCount(1);
@@ -290,3 +292,5 @@ class Searcher : public Nan::ObjectWrap{
   static NAN_METHOD(Search);
 
 };
+
+#endif

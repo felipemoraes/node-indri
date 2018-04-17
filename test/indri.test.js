@@ -26,3 +26,18 @@ describe('Searcher', function() {
 });
 
 
+
+
+describe('Reader', function() {
+
+    it('should create Reader object ', function() {
+        var reader = new indri.Reader("./etc/poems_index");
+        expect(reader).to.not.be.null;
+    });
+
+    it('should not create Reader object ', function() {
+        expect(indri.Reader).to.throw(Error);
+    });
+
+});
+

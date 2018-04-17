@@ -41,9 +41,14 @@ npm test
 
 # Examples
 
+
 ```
 const indri =  require('../build/Release/node-indri');
+```
 
+## Searcher
+
+```
 var searcher = new indri.Searcher(
     {
     "index": "index_path", 
@@ -60,6 +65,14 @@ var searcher = new indri.Searcher(
 );
 
 searcher.search(query, page, feedback_docs, callback);
+
+## Reader 
+
+```
+
+var reader = new indri.Reader("index": "index_path");
+
+reader.getDocument(docid, callback);
 
 ```
 
