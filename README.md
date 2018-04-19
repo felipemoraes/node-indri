@@ -55,7 +55,6 @@ var searcher = new indri.Searcher(
     "rules" : "rules", // method:dirichlet,mu:1000
     "fbTerms": 10,
     "fbMu": 1500, 
-    "resultsPerPage": 10,
     "includeDocument" : true,
     "includeFields": [{ 
         "nameInIndex1": "nameInResponse1", 
@@ -64,7 +63,7 @@ var searcher = new indri.Searcher(
     ]}
 );
 
-searcher.search(query, page, feedback_docs, callback);
+searcher.search(query, page, results_per_page, feedback_docs, callback);
 ```
 
 ## Reader 

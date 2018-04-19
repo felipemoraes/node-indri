@@ -13,8 +13,7 @@ describe('Searcher', function() {
             "fbTerms": 10,
             "fbMu": 1500, 
             "includeFields": { "title": "headline"},
-            "includeDocument" : true,
-            "resultsPerPage": 10}
+            "includeDocument" : true}
         );
         expect(searcher).to.not.be.null;
     });

@@ -2,14 +2,12 @@
 
 
 vector<SearchResult> search(SearchParameters& parameters, std::string query,
-    int page, std::vector<int>& feedback_docs){
+    int page, int  results_per_page, std::vector<int>& feedback_docs){
 
-    
     indri::api::QueryAnnotation* annotation;
 
     std::vector<indri::api::ScoredExtentResult> results;
-    int resultsPerPage = parameters.results_per_page;
-    int numberResults = page*resultsPerPage;
+    int numberResults = page*results_per_page;
     
     if (feedback_docs.size() != 0) {
 
@@ -45,7 +43,7 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
 
     vector<SearchResult> searchResults;
 
-    for(int i = (page-1)*resultsPerPage; i < documents.size(); i++) {
+    for(int i = (page-1)*results_per_page; i < documents.size(); i++) {
         
         indri::api::SnippetBuilder builder(true);
         
@@ -95,12 +93,17 @@ NAN_METHOD(Searcher::Search){
       return Nan::ThrowError(Nan::New("expected arg 2: number").ToLocalChecked());
     }
 
-    if (!info[2]->IsArray()) {
-      return Nan::ThrowError(Nan::New("expected arg 3: array").ToLocalChecked());
+    if (!info[2]->IsNumber()) {
+      return Nan::ThrowError(Nan::New("expected arg 3: number").ToLocalChecked());
     }
 
-    if(!info[3]->IsFunction()) {
-      return Nan::ThrowError(Nan::New("expected arg 4: function callback").ToLocalChecked());
+    if (!info[3]->IsArray()) {
+      return Nan::ThrowError(Nan::New("expected arg 4: array").ToLocalChecked());
+    }
+
+
+    if(!info[4]->IsFunction()) {
+      return Nan::ThrowError(Nan::New("expected arg 5: function callback").ToLocalChecked());
     }
 
 
@@ -108,11 +111,13 @@ NAN_METHOD(Searcher::Search){
     
     std::string query(*arg1, arg1.length());
     
-    double page = info[1]->IsUndefined() ? 10 : info[1]->NumberValue();
+    double page = info[1]->IsUndefined() ? 1 : info[1]->NumberValue();
+
+    double results_per_page = info[2]->IsUndefined() ? 10 : info[2]->NumberValue();
 
     std::vector<int> fb_docs;
 
-    v8::Local<v8::Array> jsArr = v8::Local<v8::Array>::Cast(info[2]);
+    v8::Local<v8::Array> jsArr = v8::Local<v8::Array>::Cast(info[3]);
     for (int i = 0; i < jsArr->Length(); i++) {
         v8::Local<v8::Value> jsElement = jsArr->Get(i);
         fb_docs.push_back(jsElement->NumberValue());
@@ -120,8 +125,8 @@ NAN_METHOD(Searcher::Search){
 
     Searcher* obj = ObjectWrap::Unwrap<Searcher>(info.Holder());
 
-    Nan::AsyncQueueWorker(new SearchAsyncWorker(obj->parameters, query, page, fb_docs,
-            new Nan::Callback(info[3].As<v8::Function>())
+    Nan::AsyncQueueWorker(new SearchAsyncWorker(obj->parameters, query, page, results_per_page, fb_docs,
+            new Nan::Callback(info[4].As<v8::Function>())
     ));
 
 }

@@ -28,7 +28,6 @@ typedef struct  {
 
 typedef struct  {
   std::unordered_map<std::string,std::string> includeFields;
-  int results_per_page;
   indri::api::QueryEnvironment* environment;
   indri::query::QueryExpander* expander;
   indri::api::Parameters parameters;
@@ -37,7 +36,7 @@ typedef struct  {
 
 
 vector<SearchResult> search(SearchParameters& parameters, std::string query,
-    int page, std::vector<int>& feedback_docs);
+    int page, int results_per_page, std::vector<int>& feedback_docs);
 
 static Persistent<v8::FunctionTemplate> searcher_constructor;
 
@@ -47,22 +46,24 @@ private:
   SearchParameters parameters_;
   std::string query_; 
   int page_; 
+  int results_per_page_;
   std::vector<int> feedback_docs_;
   vector<SearchResult> results_;
 
 public:
   SearchAsyncWorker(SearchParameters& parameters, std::string query, 
-        int page, std::vector<int> &feedback_docs, Nan::Callback *callback)
+        int page,  int results_per_page,  std::vector<int> &feedback_docs, Nan::Callback *callback)
     : Nan::AsyncWorker(callback) {
 
     this->parameters_ = parameters;
     this->query_ = query;
     this->page_ = page;
+    this->results_per_page_ = results_per_page;
     this->feedback_docs_ = feedback_docs;
   }
 
   void Execute() {
-    this->results_ = search(this->parameters_, this->query_, this->page_, this->feedback_docs_);
+    this->results_ = search(this->parameters_, this->query_, this->page_, this->results_per_page_, this->feedback_docs_);
   }
 
   void HandleOKCallback() {
@@ -171,7 +172,6 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> fbTermsProp = Nan::New("fbTerms").ToLocalChecked();
     v8::Local<v8::String> fbMuProp = Nan::New("fbMu").ToLocalChecked();
     v8::Local<v8::String> fieldsProp = Nan::New("includeFields").ToLocalChecked();
-    v8::Local<v8::String> resultsPerPageProp = Nan::New("resultsPerPage").ToLocalChecked();
     v8::Local<v8::String> includeDocumentProp = Nan::New("includeDocument").ToLocalChecked();
     v8::Local<v8::String>  fbDocsProp = Nan::New("fbDocs").ToLocalChecked();
 
@@ -185,8 +185,6 @@ class Searcher : public Nan::ObjectWrap{
 
     int fbTerms = 100;
     int fbMu = 1500;
-
-    int resultsPerPage = 10;
 
     int fbDocs = -1;
 
@@ -234,10 +232,6 @@ class Searcher : public Nan::ObjectWrap{
       }
     }
 
-    if (Nan::HasOwnProperty(jsonObj, resultsPerPageProp).FromJust()) {
-      v8::Local<v8::Value> resultsPerPageValue = Nan::Get(jsonObj, resultsPerPageProp).ToLocalChecked();
-      resultsPerPage = resultsPerPageValue->NumberValue();
-    }
 
     if (Nan::HasOwnProperty(jsonObj, includeDocumentProp).FromJust()) {
       v8::Local<v8::Value> includeDocumentValue = Nan::Get(jsonObj, includeDocumentProp).ToLocalChecked();
@@ -249,7 +243,6 @@ class Searcher : public Nan::ObjectWrap{
       fbDocs = fbDocsValue->NumberValue();
       
     }
-
     parameters->set("fbDocs", fbDocs);
     parameters->set("fbTerms", fbTerms);
     parameters->set("fbMu", fbMu);
@@ -277,9 +270,7 @@ class Searcher : public Nan::ObjectWrap{
     search_parameters.expander = expander;
     search_parameters.includeFields = fields;
     search_parameters.includeDocument = includeDocument;
-    search_parameters.results_per_page = resultsPerPage;
 
-    
 
     obj->parameters = search_parameters;
 

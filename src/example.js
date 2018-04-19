@@ -7,11 +7,10 @@ var searcher = new indri.Searcher(
     "fbTerms": 10,
     "fbMu": 1500, 
     "includeFields": { "title": "headline", "docno": "docno"},
-    "includeDocument" : true,
-    "resultsPerPage": 10}
+    "includeDocument" : true}
 );
 
-var results = searcher.search("school", 1, [2], function(error, results) {
+var results = searcher.search("school", 1, 10, [2], function(error, results) {
     if (error) {
       console.log("error");
     }
