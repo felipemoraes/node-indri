@@ -259,10 +259,17 @@ class Searcher : public Nan::ObjectWrap{
 
     environment->setScoringRules(rules);
     
-    environment->addIndex(parameters->get("index", ""));
+    try {
+      environment->addIndex(parameters->get("index", ""));
+    } catch (const lemur::api::Exception& e) {
+      return Nan::ThrowError(Nan::New("Searcher::New could not open index").ToLocalChecked());
+    }
 
-    expander = new indri::query::RMExpander(environment, *parameters);
-
+    try {
+      expander = new indri::query::RMExpander(environment, *parameters);
+    } catch (const lemur::api::Exception& e) {
+      return Nan::ThrowError(Nan::New("Searcher::New could not create query expander").ToLocalChecked());
+    }
     
 
     SearchParameters search_parameters;

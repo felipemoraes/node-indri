@@ -8,21 +8,27 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
 
     std::vector<indri::api::ScoredExtentResult> results;
     int numberResults = page*results_per_page;
-    
-    if (feedback_docs.size() != 0) {
 
-        std::vector<indri::api::ScoredExtentResult> score_fb_docs;
-        for (int i = 0; i < feedback_docs.size(); i++) {
-          indri::api::ScoredExtentResult r(0.0, feedback_docs[i]);
-          score_fb_docs.push_back(r);
-        }
-        std::string expandedQuery = parameters.expander->expand( query, score_fb_docs);
-        
-        annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
+    vector<SearchResult> searchResults;
+
+    try {
+      if (feedback_docs.size() != 0) {
+
+          std::vector<indri::api::ScoredExtentResult> score_fb_docs;
+          for (int i = 0; i < feedback_docs.size(); i++) {
+            indri::api::ScoredExtentResult r(0.0, feedback_docs[i]);
+            score_fb_docs.push_back(r);
+          }
+          std::string expandedQuery = parameters.expander->expand( query, score_fb_docs);
+          
+          annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
+          results  = annotation->getResults();
+      } else {
+        annotation = parameters.environment->runAnnotatedQuery( query, numberResults);
         results  = annotation->getResults();
-    } else {
-      annotation = parameters.environment->runAnnotatedQuery( query, numberResults);
-      results  = annotation->getResults();
+      }
+    } catch (const lemur::api::Exception& e) {
+        return searchResults;
     }
 
 
@@ -37,33 +43,40 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
     std::unordered_map<std::string,std::vector<std::string> > fieldsData;
 
     for (auto fieldMap : parameters.includeFields) {
+      try {
         auto valueFields = parameters.environment->documentMetadata(results, fieldMap.first);
+      
         fieldsData.emplace(fieldMap.second, valueFields);
+      } catch (const lemur::api::Exception& e) {
+      }
     }
-
-    vector<SearchResult> searchResults;
 
     for(int i = (page-1)*results_per_page; i < documents.size(); i++) {
         
         indri::api::SnippetBuilder builder(true);
         
-        std::string snippet = builder.build( results[i].document, documents[i], annotation );
-
-        snippet.erase(std::remove(snippet.begin(), snippet.end(), '\n'), snippet.end());
-
         SearchResult result;
-        result.snippet = snippet;
+        
         result.docid = results[i].document;
 
-        if (parameters.includeDocument) {
-          result.document =  std::string(documents[i]->text, documents[i]->textLength);
+        try {
+
+          std::string snippet = builder.build( results[i].document, documents[i], annotation );
+
+          snippet.erase(std::remove(snippet.begin(), snippet.end(), '\n'), snippet.end());
+          result.snippet = snippet;
+          
+          if (parameters.includeDocument) {
+            result.document =  std::string(documents[i]->text, documents[i]->textLength);
+          }
+        } catch (const lemur::api::Exception& e) {
+
         }
 
 
       for (auto fieldMap : fieldsData) {
         auto valueFields = fieldMap.second;
         result.fields.emplace(fieldMap.first, valueFields[i]);
-      
       } 
 
 

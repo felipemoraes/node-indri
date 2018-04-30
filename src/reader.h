@@ -44,6 +44,7 @@ public:
 
   void Execute() {
     this->document_ = get_document(this->collection_, this->docid_);
+
   }
 
   void HandleOKCallback() {
@@ -140,8 +141,13 @@ class Reader : public Nan::ObjectWrap{
     
     
     indri::collection::Repository* r = new indri::collection::Repository;
-
-    r->openRead(index);
+    
+    try {
+      r->openRead(index);
+    } catch (const lemur::api::Exception& e) {
+      return Nan::ThrowError(Nan::New("Reader::New could not open index").ToLocalChecked());
+    }
+    
 
     indri::collection::CompressedCollection* collection = r->collection();
     obj->collection_ = collection;

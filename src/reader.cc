@@ -5,15 +5,20 @@ Document get_document(indri::collection::CompressedCollection* collection, int d
     doc.docid = docid;
 
 
-    indri::api::ParsedDocument* document = collection->retrieve(docid);
-    doc.text = document->text;
-       
+    try {
+        indri::api::ParsedDocument* document = collection->retrieve(docid);
+        doc.text = document->text;
         
-    for( size_t i=0; i<document->metadata.size(); i++ ) {
-        if( document->metadata[i].key[0] == '#' )
-            continue;
-        doc.fields.emplace(document->metadata[i].key, (const char*) document->metadata[i].value);
+            
+        for( size_t i=0; i<document->metadata.size(); i++ ) {
+            if( document->metadata[i].key[0] == '#' )
+                continue;
+            doc.fields.emplace(document->metadata[i].key, (const char*) document->metadata[i].value);
+        }
+    } catch (const lemur::api::Exception& e) {
+
     }
+
 
     return doc;
 }
@@ -37,7 +42,9 @@ NAN_METHOD(Reader::GetDocument){
     }
     
     int docid = info[0]->IsUndefined() ? -1 : info[0]->NumberValue();
-
+    if (docid == -1) {
+        return Nan::ThrowError(Nan::New("Reader:: invalid document id").ToLocalChecked());
+    }
    
     Reader* obj = ObjectWrap::Unwrap<Reader>(info.Holder());
 
