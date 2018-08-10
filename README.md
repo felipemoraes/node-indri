@@ -12,25 +12,28 @@ sudo apt install npm
 which node
 ```
 
-- Install [Cmake](https://cmake.org/) and [Cmake-js](https://www.npmjs.com/package/cmake-js)
+- Install [Cmake](https://cmake.org/), [zlib](https://zlib.net/), and [Cmake-js](https://www.npmjs.com/package/cmake-js)
 ```
-sudo apt install cmake
+sudo apt install cmake zlib1g-dev
 sudo npm install cmake-js -g
 ```
 
 - Install [Indri](https://www.lemurproject.org/indri.php):
 ```
-wget <link-5.11.tar.gz>
+wget https://sourceforge.net/projects/lemur/files/lemur/indri-5.11/indri-5.11.tar.gz
 tar xzvf indri-5.11.tar.gz
 cd indri-5.11
 ./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0"
 make
 sudo make install
+cd ..
 ```
 
 - Install node-indri
 
 ```
+git clone https://github.com/felipemoraes/node-indri.git
+cd node-indri
 npm install --unsafe-perm
 ```
 
@@ -40,13 +43,14 @@ npm test
 ```
 
 # Examples
-
+Require the native module that was built during the setup. You can find it at the path below in the node-indri folder, usually you want to copy the module into the project that you are using it in and adjust the path accordingly.
 
 ```
-const indri =  require('../build/Release/node-indri');
+const indri =  require('./build/Release/node-indri');
 ```
 
 ## Searcher
+Use the Searcher to execute a search with optional relevance feedback. Pass an empty list as `feedback_docs` to use no relevance feedback.
 
 ```
 var searcher = new indri.Searcher(
@@ -67,6 +71,7 @@ searcher.search(query, page, results_per_page, feedback_docs, callback);
 ```
 
 ## Reader 
+Use the Reader to retrieve an individual document by id.
 
 ```
 
