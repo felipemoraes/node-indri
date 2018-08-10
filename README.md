@@ -74,11 +74,9 @@ searcher.search(query, page, results_per_page, feedback_docs, callback);
 Use the Reader to retrieve an individual document by id.
 
 ```
-
 var reader = new indri.Reader("index": "index_path");
 
 reader.getDocument(docid, callback);
-
 ```
 
 # Implementation details 
