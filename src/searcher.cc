@@ -5,7 +5,7 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
     int page, int  results_per_page, std::vector<int>& feedback_docs){
 
     indri::api::QueryAnnotation* annotation;
-
+    
     std::vector<indri::api::ScoredExtentResult> results;
     int numberResults = page*results_per_page;
 
@@ -52,13 +52,13 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
     }
 
     for(int i = (page-1)*results_per_page; i < documents.size(); i++) {
-        
+    	
         indri::api::SnippetBuilder builder(true);
         
         SearchResult result;
         
         result.docid = results[i].document;
-
+	result.score = results[i].score;
         try {
 
           std::string snippet = builder.build( results[i].document, documents[i], annotation );
@@ -72,7 +72,6 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
         } catch (const lemur::api::Exception& e) {
 
         }
-
 
       for (auto fieldMap : fieldsData) {
         auto valueFields = fieldMap.second;

@@ -23,6 +23,7 @@ typedef struct  {
     std::string snippet;
     std::string document;
     int docid;
+    float score;
 } SearchResult;
 
 
@@ -32,6 +33,7 @@ typedef struct  {
   indri::query::QueryExpander* expander;
   indri::api::Parameters parameters;
   bool includeDocument;
+  bool includeDocumentScore;
 } SearchParameters;
 
 
@@ -77,6 +79,8 @@ public:
     v8::Local<v8::String> fieldsKey = Nan::New("fields").ToLocalChecked();
     v8::Local<v8::String> snippetKey = Nan::New("snippet").ToLocalChecked();
     v8::Local<v8::String> documentKey = Nan::New("document").ToLocalChecked();
+    v8::Local<v8::String> documentScoreKey = Nan::New("score").ToLocalChecked();
+    
 
 
     for(int i = 0; i < this->results_.size(); ++i) {
@@ -94,7 +98,7 @@ public:
 
         v8::Local<v8::Value> docidValue = Nan::New(result.docid);
         v8::Local<v8::Value> snippetValue = Nan::New(result.snippet).ToLocalChecked();
-
+        
         Nan::Set(jsonObject, docidKey, docidValue);
         Nan::Set(jsonObject, snippetKey, snippetValue);
         Nan::Set(jsonObject, fieldsKey, fieldsJsonObject);
@@ -104,6 +108,10 @@ public:
           Nan::Set(jsonObject, documentKey, documentValue);
         }
 
+        if (this->parameters_.includeDocumentScore) {
+	  v8::Local<v8::Value> documentScoreValue = Nan::New(result.score);
+	  Nan::Set(jsonObject, documentScoreKey, documentScoreValue);
+	}
         resultArray->Set(i, jsonObject);
     }
 
@@ -173,6 +181,7 @@ class Searcher : public Nan::ObjectWrap{
     v8::Local<v8::String> fbMuProp = Nan::New("fbMu").ToLocalChecked();
     v8::Local<v8::String> fieldsProp = Nan::New("includeFields").ToLocalChecked();
     v8::Local<v8::String> includeDocumentProp = Nan::New("includeDocument").ToLocalChecked();
+    v8::Local<v8::String> includeDocumentScoreProp = Nan::New("includeDocumentScore").ToLocalChecked();
     v8::Local<v8::String>  fbDocsProp = Nan::New("fbDocs").ToLocalChecked();
 
     std::string index = "";
@@ -182,6 +191,8 @@ class Searcher : public Nan::ObjectWrap{
     std::unordered_map<std::string, std::string> fields;
 
     bool includeDocument = false;
+
+    bool includeDocumentScore = false;
 
     int fbTerms = 100;
     int fbMu = 1500;
@@ -238,6 +249,11 @@ class Searcher : public Nan::ObjectWrap{
       includeDocument = includeDocumentValue->BooleanValue();
     }
 
+    if (Nan::HasOwnProperty(jsonObj, includeDocumentScoreProp).FromJust()) {
+      v8::Local<v8::Value> includeDocumentScoreValue = Nan::Get(jsonObj, includeDocumentScoreProp).ToLocalChecked();
+      includeDocumentScore = includeDocumentScoreValue->BooleanValue();
+    }
+
     if (Nan::HasOwnProperty(jsonObj, fbDocsProp).FromJust()) {
       v8::Local<v8::Value> fbDocsValue = Nan::Get(jsonObj, fbDocsProp).ToLocalChecked();
       fbDocs = fbDocsValue->NumberValue();
@@ -248,7 +264,6 @@ class Searcher : public Nan::ObjectWrap{
     parameters->set("fbMu", fbMu);
 
     Searcher* obj = new Searcher();
-
         
     std::vector<std::string> rules;
 
@@ -277,6 +292,7 @@ class Searcher : public Nan::ObjectWrap{
     search_parameters.expander = expander;
     search_parameters.includeFields = fields;
     search_parameters.includeDocument = includeDocument;
+    search_parameters.includeDocumentScore = includeDocumentScore;
 
 
     obj->parameters = search_parameters;
