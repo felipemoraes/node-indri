@@ -28,3 +28,17 @@ reader.getDocument(1,  function(error, data) {
       console.log(data);
   }
 );
+
+
+var scorer = new indri.Scorer( 
+  {"index": "./etc/poems_index", 
+  "rules" : "method:dirichlet,mu:1000"}
+);
+
+scorer.score("summer school", [], 2, function(error, results) {
+    if (error) {
+      console.log("error");
+    } else {
+      console.log(results);
+    }
+})

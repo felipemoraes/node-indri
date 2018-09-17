@@ -25,8 +25,6 @@ describe('Searcher', function() {
 });
 
 
-
-
 describe('Reader', function() {
 
     it('should create Reader object ', function() {
@@ -40,3 +38,23 @@ describe('Reader', function() {
 
 });
 
+
+
+describe('Scorer', function() {
+
+    it('should create Scorer object ', function() {
+        var scorer = new indri.Scorer( 
+            {"index": "./etc/poems_index", 
+            "rules" : "method:dirichlet,mu:1000"}
+        );
+        
+        expect(scorer).to.not.be.null;
+    });
+
+    it('should not create Scorer object ', function() {
+        expect(indri.Scorer).to.throw(Error);
+    });
+
+
+
+});
