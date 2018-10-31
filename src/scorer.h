@@ -30,32 +30,46 @@ typedef struct  {
 } ScorerParameters;
 
 
-vector<ScoredSearchResult> score(ScorerParameters& parameters, std::string query,
-    std::vector<int>& docs, int number_results);
+vector<ScoredSearchResult> scoreDocuments(ScorerParameters& parameters, std::string query,
+    std::vector<int>& docs);
+
+vector<ScoredSearchResult> retrieveTopKScores(ScorerParameters& parameters, std::string query, 
+int number_results);
 
 static Persistent<v8::FunctionTemplate> scorer_constructor;
 
-class ScoreAsyncWorker : public Nan::AsyncWorker {
+class ScorerAsyncWorker : public Nan::AsyncWorker {
 private:
 
   ScorerParameters parameters_;
   std::string query_; 
-  int number_results_;
   std::vector<int> docs_;
   vector<ScoredSearchResult> results_;
+  int number_results_;
 
 public:
-  ScoreAsyncWorker(ScorerParameters& parameters, std::string query, std::vector<int> &docs, 
-  int number_results, Nan::Callback *callback): Nan::AsyncWorker(callback) {
+  ScorerAsyncWorker(ScorerParameters& parameters, std::string query, std::vector<int> &docs, 
+    Nan::Callback *callback): Nan::AsyncWorker(callback) {
 
     this->parameters_ = parameters;
     this->query_ = query;
-    this->number_results_ = number_results;
     this->docs_ = docs;
+    this->number_results_ = docs.size();
+  }
+
+  ScorerAsyncWorker(ScorerParameters& parameters, std::string query, int number_results, 
+    Nan::Callback *callback): Nan::AsyncWorker(callback) {
+    this->parameters_ = parameters;
+    this->query_ = query;
+    this->number_results_ = number_results;
   }
 
   void Execute() {
-    this->results_ = score(this->parameters_, this->query_, this->docs_, this->number_results_);
+    if (this->docs_.size() == 0) {
+      this->results_ = retrieveTopKScores(this->parameters_, this->query_, this->number_results_);
+    } else {
+      this->results_ = scoreDocuments(this->parameters_, this->query_, this->docs_);
+    }
   }
 
   void HandleOKCallback() {
@@ -80,7 +94,7 @@ public:
         v8::Local<v8::Value> documentScoreValue = Nan::New(result.score);
         
         Nan::Set(jsonObject, docidKey, docidValue);
-	    Nan::Set(jsonObject, documentScoreKey, documentScoreValue);
+	      Nan::Set(jsonObject, documentScoreKey, documentScoreValue);
 	    
         resultArray->Set(i, jsonObject);
     }
@@ -112,7 +126,8 @@ class Scorer : public Nan::ObjectWrap{
       tpl->SetClassName(Nan::New<v8::String>("Scorer").ToLocalChecked());
 
       tpl->InstanceTemplate()->SetInternalFieldCount(1);
-      SetPrototypeMethod(tpl, "score", Scorer::Score);
+      SetPrototypeMethod(tpl, "scoreDocuments", Scorer::ScoreDocuments);
+      SetPrototypeMethod(tpl, "retrieveTopKScores", Scorer::RetrieveTopKScores);
 
       Set(target, Nan::New<v8::String>("Scorer").ToLocalChecked(), tpl->GetFunction());
   }
@@ -152,8 +167,6 @@ class Scorer : public Nan::ObjectWrap{
 
     std::string rule = "";
 
-   
-
     indri::api::Parameters* parameters = new indri::api::Parameters();
   
     if (Nan::HasOwnProperty(jsonObj, indexProp).FromJust()) {
@@ -167,9 +180,6 @@ class Scorer : public Nan::ObjectWrap{
       rule = std::string(*Nan::Utf8String(rulesValue->ToString()));
       parameters->set("rules", rule);
     }
-    
-
-   
 
     Scorer* obj = new Scorer();
         
@@ -188,9 +198,6 @@ class Scorer : public Nan::ObjectWrap{
       return Nan::ThrowError(Nan::New("Scorer::New could not open index").ToLocalChecked());
     }
 
-
-    
-
     ScorerParameters scorer_parameters;
     scorer_parameters.environment = environment;
 
@@ -203,7 +210,8 @@ class Scorer : public Nan::ObjectWrap{
 
   }
   
-  static NAN_METHOD(Score);
+  static NAN_METHOD(ScoreDocuments);
+  static NAN_METHOD(RetrieveTopKScores);
 
 };
 
