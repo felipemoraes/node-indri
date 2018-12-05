@@ -107,6 +107,17 @@ node-indri was implemented using Native Abstractions for Node.js (NAN) and C++11
 
 
 
-
+# Citation
+If you use node-indri to produce results for your scientific publication, please refer to our [ECIR 2019]() paper.
+```
+@inproceedings{moraes2019nodeindri,
+  title={node-indri: moving the Indri toolkit to the modern Web stack},
+  author={Moraes, Felipe and Hauff, Claudia},
+  booktitle={ECIR},
+  year={2019}
+}
+```
+# License
+[MIT](https://opensource.org/licenses/MIT) License
 
 
