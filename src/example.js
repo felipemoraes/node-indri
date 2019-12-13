@@ -1,41 +1,41 @@
 const indri = require('../build/Release/node-indri');
 
+console.log(indri);
 
-var searcher = new indri.Searcher( 
-    {"index": "./etc/poems_index", 
-    "rules" : "method:dirichlet,mu:1000",
-    "fbTerms": 10,
-    "fbMu": 1500, 
-    "includeFields": { "title": "headline", "docno": "docno"},
-    "includeDocument" : true}
-);
+// let searcher = new indri.Searcher( 
+//     {"index": "../etc/poems_index", 
+//     "rules" : "method:dirichlet,mu:1000",
+//     "fbTerms": 10,
+//     "fbMu": 1500, 
+//     "includeFields": { "title": "headline", "docno": "docno"},
+//     "includeDocument" : false}
+// );
 
-var results = searcher.search("school", 1, 10, [2], function(error, results) {
-    if (error) {
-      console.log("error");
-    }
-    console.log(results);
-  }
-);
+// let results = searcher.search("summer school", 1, 10, [2], function(error, results) {
+//     if (error) {
+//       console.log("error");
+//     }
+//     console.log(results);
+//   }
+// );
 
 
-var reader = new indri.Reader("./etc/poems_index")
+// var reader = new indri.Reader("../etc/poems_index")
 
-reader.getDocument(1,  function(error, data) {
-     if (error) {
-       console.log("error");
-     }
-      console.log(data);
-  }
-);
-
+// reader.getDocument(1,  function(error, data) {
+//      if (error) {
+//        console.log("error");
+//      }
+//       console.log(data);
+//   }
+// );
 
 var scorer = new indri.Scorer( 
-  {"index": "./etc/poems_index", 
+  {"index": "../etc/poems_index", 
   "rules" : "method:dirichlet,mu:1000"}
 );
 
-scorer.score("summer school", [], 2, function(error, results) {
+scorer.scoreDocuments("summer school", [1], function(error, results) {
     if (error) {
       console.log("error");
     } else {

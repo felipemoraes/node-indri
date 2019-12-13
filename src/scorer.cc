@@ -1,5 +1,193 @@
 #include "scorer.h"
 
+Napi::FunctionReference Scorer::constructor;
+
+Napi::Object Scorer::Init(Napi::Env env, Napi::Object exports) {
+    Napi::HandleScope scope(env);
+
+    Napi::Function func = DefineClass(env, "Scorer", {
+        InstanceMethod("scoreDocuments", &Scorer::ScoreDocuments),
+        InstanceMethod("retrieveTopKScores", &Scorer::RetrieveTopKScores)
+    });
+
+    constructor = Napi::Persistent(func);
+    constructor.SuppressDestruct();
+
+    exports.Set("Scorer", func);
+    return exports;
+}
+
+Scorer::Scorer(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Scorer>(info)  {
+    Napi::Env env = info.Env();
+    Napi::HandleScope scope(env);
+
+    int length = info.Length();
+    if (length != 1) {
+        Napi::TypeError::New(env, "Only one argument expected").ThrowAsJavaScriptException();
+    }
+
+    if(!info[0].IsObject()){
+        Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
+    }
+
+    Napi::Object jsonObj = info[0].As<Napi::Object>();
+  
+
+    std::string index = "";
+
+    std::string rule = "";
+
+    indri::api::Parameters* parameters = new indri::api::Parameters();
+  
+    if (jsonObj.Has("index")) {
+        index = jsonObj.Get("index").As<Napi::String>().Utf8Value();
+        parameters->set("index", index);
+    }
+
+    if (jsonObj.Has("rules")) {
+        rule = jsonObj.Get("rules").As<Napi::String>().Utf8Value();
+        parameters->set("rules", index);
+    }
+
+        
+    std::vector<std::string> rules;
+
+    rules.push_back(parameters->get("rules", ""));
+
+    indri::api::QueryEnvironment* environment = new indri::api::QueryEnvironment();
+
+    environment->setScoringRules(rules);
+    
+    try {
+        environment->addIndex(parameters->get("index", ""));
+    } catch (const lemur::api::Exception& e) {
+        Napi::TypeError::New(env, "Wrong arguments").ThrowAsJavaScriptException();
+    }
+
+
+    ScorerParameters scorer_parameters;
+    scorer_parameters.environment = environment;
+
+    this->parameters_ = scorer_parameters;
+
+}
+
+class ScorerWorker: public Napi::AsyncWorker {
+  public:
+    ScorerWorker(ScorerParameters& parameters, std::string query, std::vector<int> &docs, int number_results, 
+    Napi::Function& callback)
+      : Napi::AsyncWorker(callback), parameters_(parameters), query_(query), docs_(docs) ,
+      number_results_(number_results) {
+    }
+
+  private:
+    void Execute() {
+        if (this->docs_.size() == 0) {
+            this->results_ = retrieveTopKScores(this->parameters_, this->query_, this->number_results_);
+        } else {
+            this->results_ = scoreDocuments(this->parameters_, this->query_, this->docs_);
+        }
+    }
+
+    void OnOK() {
+        const Napi::Env env = Env();
+        const Napi::HandleScope scope(env);
+        Napi::Array js_results = Napi::Array::New(env, this->results_.size());
+        ToJS(env, js_results);
+        Callback().Call({env.Undefined(), js_results});
+    }
+
+    void ToJS(const Napi::Env &env, Napi::Array &js_results){
+        for (int i=0; i<results_.size(); i++) {
+            Napi::Object obj = Napi::Object::New(env);
+            obj.Set("docid", results_[i].docid);
+            obj.Set("score", results_[i].score);
+            js_results[i] = obj;
+        }
+    }
+
+    ScorerParameters parameters_;
+    std::string query_; 
+    std::vector<int> docs_;
+    vector<ScoredSearchResult> results_;
+    int number_results_;
+};
+
+
+
+
+Napi::Value Scorer::ScoreDocuments(const Napi::CallbackInfo& info) {
+
+    if (info.Length() != 3) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::ScoreDocuments - expected 3 arguments");
+    }
+
+    // expect first argument to be string
+    if(!info[0].IsString()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::ScoreDocuments - expected arg 1: string");
+    }
+
+    // expect second argument to be number
+    if(!info[1].IsArray()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::ScoreDocuments - expected arg 2: array");
+    }
+
+    if(!info[2].IsFunction()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::ScoreDocuments - expected arg 3: function callback");
+    }
+    
+    std::string query = info[0].As<Napi::String>().Utf8Value();
+
+    std::vector<int> docs;
+
+    Napi::Array jsArr = info[1].As<Napi::Array>();
+
+    for (int i = 0; i < jsArr.Length(); i++) {
+        Napi::Value v = jsArr[i];
+        int docid = (int) v.As<Napi::Number>();
+        docs.push_back(docid);
+    } 
+
+    Napi::Function callback = info[2].As<Napi::Function>();
+
+    ScorerWorker* worker = new ScorerWorker(parameters_, query, docs, docs.size(), callback);
+    worker->Queue();
+    return info.Env().Undefined();
+}
+
+Napi::Value Scorer::RetrieveTopKScores(const Napi::CallbackInfo& info) {
+
+    if (info.Length() != 3) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::RetrieveTopKScores - expected 3 arguments");
+    }
+
+  // expect first argument to be string
+    if(!info[0].IsString()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::RetrieveTopKScores - expected arg 1: string");
+    }
+
+    // expect second argument to be number
+    if(!info[1].IsNumber()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::RetrieveTopKScores - expected arg 2: number");
+    }
+
+    if(!info[2].IsFunction()) {
+        throw Napi::TypeError::New(info.Env(), "Scorer::RetrieveTopKScores - expected arg 3: function callback");
+    }
+    
+    std::string query = info[0].As<Napi::String>().Utf8Value();
+    
+    double number_results = info[1].As<Napi::Number>().DoubleValue();
+    std::vector<int> docs;
+
+    Napi::Function callback = info[2].As<Napi::Function>();
+
+    ScorerWorker* worker = new ScorerWorker(parameters_, query, docs, number_results, callback);
+    worker->Queue();
+    return info.Env().Undefined();
+}
+
+
 vector<ScoredSearchResult> scoreDocuments(ScorerParameters& parameters, std::string query, std::vector<int>& docs){
 
     std::vector<indri::api::ScoredExtentResult> results;
@@ -52,88 +240,4 @@ vector<ScoredSearchResult> retrieveTopKScores(ScorerParameters& parameters, std:
     }
 
     return searchResults;
-}
-
-NAN_METHOD(Scorer::ScoreDocuments){
-
-    // expect exactly 3 arguments
-    if(info.Length() == 3) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected 3 arguments").ToLocalChecked());
-    }
-
-    // expect first argument to be string
-    if(!info[0]->IsString()) {
-      return Nan::ThrowError(Nan::New("expected arg 1: string").ToLocalChecked());
-    }
-
-    // expect second argument to be array
-    if (!info[1]->IsArray()) {
-      return Nan::ThrowError(Nan::New("expected arg 2: array").ToLocalChecked());
-    }
-
-    // expect third argument to be function
-    if(!info[2]->IsFunction()) {
-      return Nan::ThrowError(Nan::New("expected arg 4: function callback").ToLocalChecked());
-    }
-
-
-
-    v8::String::Utf8Value arg1(info[0]->ToString());
-    
-    std::string query(*arg1, arg1.length());
-
-
-    v8::Local<v8::Array> jsArr = v8::Local<v8::Array>::Cast(info[1]);
-    std::vector<int> docs;
-    for (int i = 0; i < jsArr->Length(); i++) {
-        v8::Local<v8::Value> jsElement = jsArr->Get(i);
-        docs.push_back(jsElement->NumberValue());
-    } 
-
-    Scorer* obj = ObjectWrap::Unwrap<Scorer>(info.Holder());
-
-    Nan::AsyncQueueWorker(new ScorerAsyncWorker(obj->parameters, query, docs,
-            new Nan::Callback(info[2].As<v8::Function>())
-    ));
-
-}
-
-
-
-
-NAN_METHOD(Scorer::RetrieveTopKScores){
-
-    // expect exactly 3 arguments
-    if(info.Length() == 3) {
-      return Nan::ThrowError(Nan::New("Searcher::Search - expected 3 arguments").ToLocalChecked());
-    }
-
-    // expect first argument to be string
-    if(!info[0]->IsString()) {
-      return Nan::ThrowError(Nan::New("expected arg 1: string").ToLocalChecked());
-    }
-
-    // expect second argument to be number
-    if (!info[1]->IsNumber()) {
-      return Nan::ThrowError(Nan::New("expected arg 2: number").ToLocalChecked());
-    }
-
-    // expect second argument to be function
-    if(!info[2]->IsFunction()) {
-      return Nan::ThrowError(Nan::New("expected arg 3: function callback").ToLocalChecked());
-    }
-
-
-    v8::String::Utf8Value arg1(info[0]->ToString());
-    
-    std::string query(*arg1, arg1.length());
-
-    int number_results = info[1]->IsUndefined() ? 0 : info[1]->NumberValue();
-
-    Scorer* obj = ObjectWrap::Unwrap<Scorer>(info.Holder());
-
-    Nan::AsyncQueueWorker(new ScorerAsyncWorker(obj->parameters, query, number_results,
-            new Nan::Callback(info[2].As<v8::Function>())
-    ));
-
 }

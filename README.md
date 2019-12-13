@@ -1,16 +1,12 @@
 
 node-indri is native Node.js module that integrates Node.js and [Indri](https://www.lemurproject.org/indri.php) search engine 
 
+Please see releases for older versions.
+
 # Setup
-These instructions are for Ubuntu Linux, but the steps can be adapted for all major platforms with a GCC compiler.
+These instructions are for Ubuntu and MacOS, but the steps can be adapted for all major platforms with a GCC compiler.
 
-- Install [NodeJS](https://nodejs.org/en/) (at least version 8.0)
-```
-sudo apt install npm
-
-// Check if node is installed
-which node
-```
+- Install [NodeJS](https://nodejs.org/en/) (at least version 12.0)
 
 - Install [Cmake](https://cmake.org/), [zlib](https://zlib.net/), and [Cmake-js](https://www.npmjs.com/package/cmake-js)
 ```
@@ -18,23 +14,25 @@ sudo apt install cmake zlib1g-dev
 sudo npm install cmake-js -g
 ```
 
-- Install [Indri](https://www.lemurproject.org/indri.php):
+- Clone node-indri
 ```
-wget https://sourceforge.net/projects/lemur/files/lemur/indri-5.11/indri-5.11.tar.gz
-tar xzvf indri-5.11.tar.gz
-cd indri-5.11
-./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0"
+git clone https://github.com/felipemoraes/node-indri.git
+cd node-indri
+```
+
+- Install customized [Indri](https://www.lemurproject.org/indri.php) by Fernando Diaz:
+```
+git clone https://github.com/diazf/indri.git
+cd indri
+./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0" --prefix=./lib/
 make
-sudo make install
+make install
 cd ..
 ```
 
 - Install node-indri
-
 ```
-git clone https://github.com/felipemoraes/node-indri.git
-cd node-indri
-npm install --unsafe-perm
+npm install
 ```
 
 - To test if everything works:
