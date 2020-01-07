@@ -1,8 +1,8 @@
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.5)
 cmake_policy(SET CMP0042 NEW)
 
 project (node-indri)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -O3 -Wno-deprecated-declarations")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DP_NEEDS_GNU_CXX_NAMESPACE=1 -D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11 -g -O3 -Wno-deprecated-declarations")
 
 include_directories(${CMAKE_JS_INC})
 
