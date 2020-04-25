@@ -45,7 +45,9 @@ Searcher::Searcher(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Searcher>(
     int fbTerms = 100;
     int fbMu = 1500;
 
-    int fbDocs = -1;
+    int fbDocs = 0;
+
+    float fbOrigWeight = 1.0f;
 
     indri::api::Parameters* parameters = new indri::api::Parameters();
   
@@ -65,6 +67,10 @@ Searcher::Searcher(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Searcher>(
 
     if (jsonObj.Has("fbMu")) {
         fbMu = jsonObj.Get("fbMu").As<Napi::Number>().DoubleValue();
+    }
+
+    if (jsonObj.Has("fbOrigWeight")) {
+        fbOrigWeight = jsonObj.Get("fbOrigWeight").As<Napi::Number>().FloatValue(); 
     }
 
     if (jsonObj.Has("includeFields")) {
@@ -93,7 +99,8 @@ Searcher::Searcher(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Searcher>(
     parameters->set("fbDocs", fbDocs);
     parameters->set("fbTerms", fbTerms);
     parameters->set("fbMu", fbMu);
-        
+    parameters->set("fbOrigWeight", fbOrigWeight);
+
     std::vector<std::string> rules;
 
     rules.push_back(parameters->get("rules", ""));
@@ -122,7 +129,7 @@ Searcher::Searcher(const Napi::CallbackInfo& info) : Napi::ObjectWrap<Searcher>(
     search_parameters.includeFields = fields;
     search_parameters.includeDocument = includeDocument;
     search_parameters.includeDocumentScore = includeDocumentScore;
-
+    search_parameters.fbDocs = fbDocs;
     this->parameters_ = search_parameters;
 }
 
@@ -178,7 +185,7 @@ class SearcherWorker: public Napi::AsyncWorker {
     std::string query;
     int page;
     int  results_per_page;
-    std::vector<int>& feedback_docs;
+    std::vector<int> feedback_docs;
 };
 
 
@@ -220,15 +227,15 @@ Napi::Value Searcher::Search(const Napi::CallbackInfo& info) {
     std::vector<int> fb_docs;
 
     Napi::Array jsArr = info[3].As<Napi::Array>();
-
     for (int i = 0; i < jsArr.Length(); i++) {
         Napi::Value v = jsArr[i];
         int docid = (int) v.As<Napi::Number>();
         fb_docs.push_back(docid);
-    } 
+    }
+
+
 
     Napi::Function callback = info[4].As<Napi::Function>();
-
     SearcherWorker* worker = new SearcherWorker(parameters_, query, page, results_per_page, fb_docs, callback);
     worker->Queue();
     return info.Env().Undefined();
@@ -242,13 +249,12 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
     int numberResults = page*results_per_page;
 
     vector<SearchResult> searchResults;
-
     try {
       if (feedback_docs.size() != 0) {
-
           std::vector<indri::api::ScoredExtentResult> score_fb_docs;
           for (int i = 0; i < feedback_docs.size(); i++) {
-            indri::api::ScoredExtentResult r(0.0, feedback_docs[i]);
+            float score = i + 1.0;
+            indri::api::ScoredExtentResult r(score, feedback_docs[i]);
             score_fb_docs.push_back(r);
           }
           std::string expandedQuery = parameters.expander->expand( query, score_fb_docs);
@@ -256,8 +262,16 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
           annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
           results  = annotation->getResults();
       } else {
-        annotation = parameters.environment->runAnnotatedQuery( query, numberResults);
-        results  = annotation->getResults();
+        if (parameters.fbDocs > 0) {
+            annotation = parameters.environment->runAnnotatedQuery( query, parameters.fbDocs);
+            results  = annotation->getResults();
+            std::string expandedQuery = parameters.expander->expand( query, results);
+            annotation = parameters.environment->runAnnotatedQuery( expandedQuery, numberResults);
+            results  = annotation->getResults();
+        } else {
+            annotation = parameters.environment->runAnnotatedQuery(query, numberResults);
+            results  = annotation->getResults();
+        }
       }
     } catch (const lemur::api::Exception& e) {
         return searchResults;
@@ -281,8 +295,9 @@ vector<SearchResult> search(SearchParameters& parameters, std::string query,
       } catch (const lemur::api::Exception& e) {
       }
     }
-
-    for(int i = (page-1)*results_per_page; i < documents.size(); i++) {
+    int start_i = (page-1)*results_per_page;
+    start_i = start_i > documents.size() ? documents.size() : start_i;
+    for(int i = start_i; i < documents.size(); i++) {
     	
         indri::api::SnippetBuilder builder(true);
         SearchResult result;

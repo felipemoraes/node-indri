@@ -31,6 +31,7 @@ typedef struct  {
   indri::api::Parameters parameters;
   bool includeDocument;
   bool includeDocumentScore;
+  int fbDocs;
 } SearchParameters;
 
 class Searcher : public Napi::ObjectWrap<Searcher> {

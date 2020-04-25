@@ -1,6 +1,6 @@
 {
   "name": "node-indri",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "",
   "main": "index.js",
   "gypfile": true,
@@ -13,7 +13,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "node-addon-api": "^1.7.1",
-    "mocha": "^5.0.5"
+    "node-addon-api": "^2.0.0"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^7.1.1"
   }
 }

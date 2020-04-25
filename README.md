@@ -24,7 +24,7 @@ cd node-indri
 ```
 git clone https://github.com/diazf/indri.git
 cd indri
-./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0" --prefix=./lib/
+./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0" --prefix=./ext/
 make
 make install
 cd ..
@@ -48,7 +48,8 @@ const indri =  require('./build/Release/node-indri');
 ```
 
 ## Searcher
-Use the Searcher to execute a search with optional relevance feedback. Pass an empty list as `feedback_docs` to use no relevance feedback.
+Use the Searcher to execute a search with optional relevance feedback. 
+You can use pseudo relevance feedback by leaving `feedback_docs` empty and set `fbDocs` the number of `fbDocs` you want to use for expanding a query. For no relevance feedback pass and empty list as `feedback_docs`.
 
 ```
 const searcher = new indri.Searcher(
@@ -57,6 +58,8 @@ const searcher = new indri.Searcher(
     "rules" : "rules", // method:dirichlet,mu:1000
     "fbTerms": 10,
     "fbMu": 1500, 
+    "fbDocs" : 10,
+    "fbOrigWeight" : 1.0,
     "includeDocument" : true,
     "includeDocumentScore" : true, 
     "includeFields": [{ 
