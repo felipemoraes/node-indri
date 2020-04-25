@@ -24,7 +24,7 @@ cd node-indri
 ```
 git clone https://github.com/diazf/indri.git
 cd indri
-./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0" --prefix=./ext/
+./configure CXX="g++ -D_GNU_SOURCE=1 -D_GLIBCXX_USE_CXX11_ABI=0" --prefix={NODE_INDRI_PATH}/ext/
 make
 make install
 cd ..
